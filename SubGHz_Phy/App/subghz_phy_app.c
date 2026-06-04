@@ -44,6 +44,7 @@ extern uint8_t lora_tx_buffer[];
 extern uint8_t lora_tx_len;
 extern volatile uint8_t tlv_ready;
 extern volatile uint8_t rx_byte;
+extern volatile uint8_t lora_busy;
 /* USER CODE END EV */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -418,6 +419,7 @@ static void OnTxTimeout(void) {
 static void OnRxTimeout(void) {
 	/* USER CODE BEGIN OnRxTimeout */
 	APP_LOG(TS_ON, VLEVEL_L, "OnRxTimeout\n\r");
+	lora_busy=0;
 	/* Update the State of the FSM*/
 	State = RX_TIMEOUT;
 	/* Run PingPong process in background*/
@@ -480,7 +482,8 @@ static void PingPong_Process(void)  //funcion de tx del rak
 			// Comportamiento normal: Se recibió el ACK regular del Slave
 			APP_LOG(TS_ON, VLEVEL_L, "--- ACK RECIBIDO CON EXITO ---\n\r");
 			RxBufferSize = 0;
-			HAL_Delay(3000); // Pausa de 3 segundos antes de mandar el próximo PING regular
+			//HAL_Delay(3000); // Pausa de 3 segundos antes de mandar el próximo PING regular
+			lora_busy=0;
 			State = TX;
 			UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_SubGHz_Phy_App_Process),
 					CFG_SEQ_Prio_0);
@@ -525,7 +528,8 @@ static void PingPong_Process(void)  //funcion de tx del rak
 		APP_LOG(TS_ON, VLEVEL_L,
 				"Master Alerta: Sin respuesta (Timeout). Reintentando PING...\n\r")
 		;
-		HAL_Delay(1000);
+		//HAL_Delay(1000);
+		lora_busy = 0;
 		State = TX;
 		UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_SubGHz_Phy_App_Process),
 				CFG_SEQ_Prio_0);

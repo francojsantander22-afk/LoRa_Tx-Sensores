@@ -108,6 +108,7 @@ extern volatile uint16_t rx_head;
 extern volatile uint16_t rx_tail;
 volatile uint8_t tlv_ready = 0;
 extern volatile uint8_t rx_byte; // byte temporal que llena la ISR
+volatile uint8_t lora_busy = 0;
 
 /* --- Buffer de línea NMEA --- */
 char line_buffer[100];
@@ -491,8 +492,10 @@ int main(void) {
 					}
 				} else if (strstr(line_buffer, "GGA") != NULL) {
 					last_gps_time = HAL_GetTick();
-					trigger_telemetry = 1;
 					gps_valid = 1;
+					if (lora_busy == 0) {
+						trigger_telemetry = 1;
+					}
 				}
 				line_index = 0;
 			} else if (c != '\r') {
@@ -501,19 +504,21 @@ int main(void) {
 		}
 
 		/* TAREA 2: Watchdog */
-		if (HAL_GetTick() - last_gps_time > 2000) {
-			if (HAL_GetTick() - last_imu_time > 1000) {
+		if (lora_busy == 0) {
+			if (HAL_GetTick() - last_gps_time > 2000) {
+				if (HAL_GetTick() - last_imu_time > 1000) {
+					last_imu_time = HAL_GetTick();
+					trigger_telemetry = 1;
+					gps_valid = 0;
+				}
+			} else {
 				last_imu_time = HAL_GetTick();
-				trigger_telemetry = 1;
-				gps_valid = 0;
 			}
-		} else {
-			last_imu_time = HAL_GetTick();
 		}
-
 		//GPS//
-		if (trigger_telemetry == 1) {
+		if (trigger_telemetry == 1 && lora_busy == 0) {
 			lora_tx_len = 0;
+			lora_busy = 1;
 
 			// Variables NMEA subidas de scope para usarlas en el ASCII print
 			char time_str[15] = { 0 }, lat_str[15] = { 0 }, ns[2] = { 0 };
@@ -578,7 +583,7 @@ int main(void) {
 			HAL_Delay(100);
 			char ascii_msg[300];
 
-			speed_scaled = (uint16_t)(gps_speed_kmh * 100.0f);
+			speed_scaled = (uint16_t) (gps_speed_kmh * 100.0f);
 			build_telemetry_payload(gps_has_fix, h, m, s, lat_int, lon_int,
 					alt_int, speed_scaled, imu.acc_x, imu.acc_y, imu.acc_z,
 					imu.gyr_x, imu.gyr_y, imu.gyr_z, temp_sht_bits, hum_bits,
@@ -591,7 +596,8 @@ int main(void) {
 				strcat(debug_msg, hex_byte);
 			}
 			char tail_buf[20];
-			snprintf(tail_buf, sizeof(tail_buf), "] %d bytes\r\n\r\n\r\n", lora_tx_len);
+			snprintf(tail_buf, sizeof(tail_buf), "] %d bytes\r\n\r\n\r\n",
+					lora_tx_len);
 			strcat(debug_msg, tail_buf);
 			UART_Print(debug_msg);
 
@@ -631,6 +637,7 @@ int main(void) {
 			}
 			UART_Print(ascii_msg);
 			tlv_ready = 1;
+			MX_SubGHz_Phy_Process();
 		}
 		//MX_SubGHz_Phy_Process();
 	}
