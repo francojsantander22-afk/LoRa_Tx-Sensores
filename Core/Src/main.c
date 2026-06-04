@@ -36,7 +36,7 @@
 /* USER CODE BEGIN PTD */
 
 /* --- Registros BMI270 --- */
-#define BMI270_I2C_ADDR     (0x68 << 1)
+#define BMI270_I2C_ADDR    	(0x68 << 1)
 #define REG_CHIP_ID         0x00
 #define REG_PWR_CONF        0x7C
 #define REG_INIT_CTRL       0x59
@@ -492,62 +492,66 @@ int main(void) {
 	/* USER CODE BEGIN WHILE */
 	while (1) {
 		uint8_t trigger = 0;
+		uint8_t gps_valid = 0;
 		/* Watchdog ISR */
 		if (huart1.RxState == HAL_UART_STATE_READY) {
 			HAL_UART_Receive_IT(&huart1, (uint8_t*) &rx_byte, 1);
 			HAL_UART_Receive_IT(&huart1, (uint8_t*) &rx_byte, 1);
 		}
 		/* TAREA 1: GPS — solo si no hay paquete pendiente */
-		if (!tlv_ready) {
-			while (rx_head != rx_tail) {
-				char c = (char) rx_buffer[rx_tail];
-				rx_tail = (rx_tail + 1) % RX_BUF_SIZE;
+		while (rx_head != rx_tail) {
+			char c = (char) rx_buffer[rx_tail];
+			rx_tail = (rx_tail + 1) % RX_BUF_SIZE;
 
-				if (c == '\n' || line_index >= sizeof(line_buffer) - 1) {
-					line_buffer[line_index] = '\0';
-					line_index = 0;
+			if (c == '\n' || line_index >= sizeof(line_buffer) - 1) {
+				line_buffer[line_index] = '\0';
+				line_index = 0;
 
-					if (strstr(line_buffer, "GGA") != NULL) {
-						last_gps_tick = HAL_GetTick();
-						GpsData_t gps_temp = { 0 };
-						if (gps_parse_gga(line_buffer, &gps_temp)) {
-							last_valid_gps = gps_temp; /* guardar fix válido */
-						}
-						trigger = 1;
-						break;
+				if (strstr(line_buffer, "GGA") != NULL) {
+					last_gps_tick = HAL_GetTick();
+					GpsData_t gps_temp = { 0 };
+					// DEBUG 1: ver quÃ© sentencia llega y quÃ© parsea
+					char dbg[130];
+					snprintf(dbg, sizeof(dbg), "[GGA] raw='%s'\r\n",
+							line_buffer);
+					UART_Print(dbg);
+					if (gps_parse_gga(line_buffer, &gps_temp)) {
+						last_valid_gps = gps_temp; /* guardar fix vÃ¡lido */
+						gps_valid = 1;
 					}
-				} else if (c != '\r') {
-					line_buffer[line_index++] = c;
-				}
-			}
-
-			/* TAREA 2: Watchdog */
-			if (!trigger) {
-				uint32_t now = HAL_GetTick();
-				if ((now - last_gps_tick > 2000)
-						&& (now - last_imu_tick > 1000)) {
-					last_imu_tick = now;
 					trigger = 1;
+					break;
 				}
-			} else {
-				last_imu_tick = HAL_GetTick();
-			}
-
-			/* TAREA 3: Empaquetar */
-			if (trigger) {
-				ImuData_t imu = { 0 };
-				imu_read(&imu);
-				telemetry_build_packet(&last_valid_gps, &imu);
-				telemetry_debug_print();
-				tlv_ready = 1;
+			} else if (c != '\r') {
+				line_buffer[line_index++] = c;
 			}
 		}
 
+		/* TAREA 2: Watchdog */
+		if (!trigger) {
+			uint32_t now = HAL_GetTick();
+			if ((now - last_gps_tick > 2000) && (now - last_imu_tick > 1000)) {
+				last_imu_tick = now;
+				trigger = 1;
+			}
+		} else {
+			last_imu_tick = HAL_GetTick();
+		}
+
+		/* TAREA 3: Empaquetar */
+		if (trigger) {
+			ImuData_t imu = { 0 };
+			imu_read(&imu);
+			telemetry_build_packet(&last_valid_gps, &imu);
+			telemetry_debug_print();
+			tlv_ready = 1;
+		}
 		MX_SubGHz_Phy_Process();
 	}
 
-	/* USER CODE END WHILE */
-	/* USER CODE BEGIN 3 */
+
+/* USER CODE END WHILE */
+/* USER CODE BEGIN 3 */
 }
 /* USER CODE END 3 */
 
@@ -556,35 +560,35 @@ int main(void) {
  * @retval None
  */
 void SystemClock_Config(void) {
-	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
+RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
 
-	HAL_PWR_EnableBkUpAccess();
-	__HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
-	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+HAL_PWR_EnableBkUpAccess();
+__HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE
-			| RCC_OSCILLATORTYPE_MSI;
-	RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-	RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
-	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_11;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-		Error_Handler();
-	}
+RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE
+		| RCC_OSCILLATORTYPE_MSI;
+RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+RCC_OscInitStruct.MSIState = RCC_MSI_ON;
+RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
+RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_11;
+RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+	Error_Handler();
+}
 
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK3 | RCC_CLOCKTYPE_HCLK
-			| RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-	RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV1;
+RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK3 | RCC_CLOCKTYPE_HCLK
+		| RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
+RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+RCC_ClkInitStruct.AHBCLK3Divider = RCC_SYSCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
-		Error_Handler();
-	}
+if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK) {
+	Error_Handler();
+}
 }
 
 /* USER CODE BEGIN 4 */
@@ -595,11 +599,11 @@ void SystemClock_Config(void) {
  * @retval None
  */
 void Error_Handler(void) {
-	/* USER CODE BEGIN Error_Handler_Debug */
-	__disable_irq();
-	while (1) {
-	}
-	/* USER CODE END Error_Handler_Debug */
+/* USER CODE BEGIN Error_Handler_Debug */
+__disable_irq();
+while (1) {
+}
+/* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef USE_FULL_ASSERT
