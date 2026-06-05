@@ -640,8 +640,9 @@ int main(void) {
 						imu.temp_BMI270, temperature_sht21, hum,
 						temperature_bmp280, pressure);
 			}
+			char separador2[100]= "------------------------------------------------------------------------\r\n\r\n";
 			UART_Print(ascii_msg);
-			UART_Print(separador);
+			UART_Print(separador2);
 			tlv_ready = 1;
 			UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_SubGHz_Phy_App_Process), CFG_SEQ_Prio_0);
 		}
