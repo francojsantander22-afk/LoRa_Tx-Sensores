@@ -421,6 +421,23 @@ int main(void) {
 	bmp280_set_standby_time(&gs_handle, BMP280_STANDBY_TIME_500_MS);
 	bmp280_set_mode(&gs_handle, BMP280_MODE_NORMAL); // Arrancar mediciones continuas
 	/* USER CODE BEGIN 2 */
+
+	// 1. Habilitar el reloj del puerto correspondiente
+	__HAL_RCC_GPIOB_CLK_ENABLE();// Ojo: Cambiar si usas GPIOA, GPIOC, etc.
+
+	// 2. Configurar el pin
+	GPIO_InitTypeDef GPIO_InitStruct = { 0 };
+	GPIO_InitStruct.Pin = LED_BLUE_Pin;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+	// 3. Aplicar configuración
+	HAL_GPIO_Init(LED_BLUE_GPIO_Port, &GPIO_InitStruct);
+
+	// 4. Iniciar con el LED apagado
+	HAL_GPIO_WritePin(LED_BLUE_GPIO_Port, LED_BLUE_Pin, GPIO_PIN_RESET);
+
 	uint32_t raw_temperature_bmp;
 	uint32_t raw_pressure;
 	float temperature_bmp280, pressure;
@@ -590,7 +607,8 @@ int main(void) {
 					alt_int, speed_scaled, imu.acc_x, imu.acc_y, imu.acc_z,
 					imu.gyr_x, imu.gyr_y, imu.gyr_z, temp_sht_bits, hum_bits,
 					press_bits);
-			char separador[100]= "------------------------------------------------------------------------\r\n";
+			char separador[100] =
+					"------------------------------------------------------------------------\r\n";
 			UART_Print(separador);
 			char debug_msg[200] = "TLV [";
 			char hex_byte[5];
@@ -600,8 +618,7 @@ int main(void) {
 				strcat(debug_msg, hex_byte);
 			}
 			char tail_buf[20];
-			snprintf(tail_buf, sizeof(tail_buf), "] %d bytes\r\n",
-					lora_tx_len);
+			snprintf(tail_buf, sizeof(tail_buf), "] %d bytes\r\n", lora_tx_len);
 			strcat(debug_msg, tail_buf);
 			UART_Print(debug_msg);
 			UART_Print(separador);
@@ -640,11 +657,13 @@ int main(void) {
 						imu.temp_BMI270, temperature_sht21, hum,
 						temperature_bmp280, pressure);
 			}
-			char separador2[100]= "------------------------------------------------------------------------\r\n\r\n";
+			char separador2[100] =
+					"------------------------------------------------------------------------\r\n\r\n";
 			UART_Print(ascii_msg);
 			UART_Print(separador2);
 			tlv_ready = 1;
-			UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_SubGHz_Phy_App_Process), CFG_SEQ_Prio_0);
+			UTIL_SEQ_SetTask((1 << CFG_SEQ_Task_SubGHz_Phy_App_Process),
+					CFG_SEQ_Prio_0);
 		}
 		MX_SubGHz_Phy_Process();
 	}

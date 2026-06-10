@@ -74,7 +74,8 @@ void Error_Handler(void);
 #define LED_GREEN_GPIO_Port GPIOA
 #define RF_SW_CTRL2_Pin GPIO_PIN_13
 #define RF_SW_CTRL2_GPIO_Port GPIOC
-
+#define LED_BLUE_Pin       GPIO_PIN_15
+#define LED_BLUE_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
